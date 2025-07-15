@@ -8,6 +8,8 @@ __pycache__/
 
 *.pt
 
+*.jpg
+
 # Distribution / packaging
 .Python
 build/
