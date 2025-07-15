@@ -66,7 +66,7 @@ async def detect_objects(files: List[UploadFile] = File(...)):
                 lane_type = check_lane_type(detected_lines)
 
             results_list.append({
-                "file name": file.filename,
+                "file_name": file.filename,
                 "lane": lane_type
             })
 
