@@ -1,9 +1,9 @@
+from typing import List
+from fastapi import FastAPI, File, UploadFile, HTTPException
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from fastapi import FastAPI
-from fastapi import File, UploadFile
-from fastapi import HTTPException
+
 app = FastAPI()
 
 LANE_RULES = {
@@ -30,38 +30,50 @@ def check_lane_type(detected_lines: set) -> str:
 model = YOLO("lane_line_detection_v1.pt")
 
 @app.post("/detect/")
-async def detect_objects(file: UploadFile):
-    try:
-        image_bytes = await file.read()
-        image = np.frombuffer(image_bytes, dtype=np.uint8)
-        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+async def detect_objects(files: List[UploadFile] = File(...)):
+    results_list = []
 
-        if image is None:
-            raise ValueError("Uploaded file is not a valid image.")
+    for file in files:
+        try:
+            image_bytes = await file.read()
+            image = np.frombuffer(image_bytes, dtype=np.uint8)
+            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
 
-        width = image.shape[1]
-        image_center_x = width // 2
-        detected_lines = set()
+            if image is None:
+                raise ValueError("Uploaded file is not a valid image.")
 
-        results = model.predict(image)
-        for result in results:
-            classes_names = result.names
-            if len(result.boxes) == 0:
-                return {"lane": "no detection"}
-            for box in result.boxes:
-                [x1, y1, x2, y2] = map(int, box.xyxy[0])
-                cls = int(box.cls[0])
-                x_center = (x1 + x2) / 2
-                class_name = classes_names[cls]
-                if x_center < image_center_x:
-                    class_name = "left_" + class_name
-                else:
-                    class_name = "right_" + class_name
-                detected_lines.add(class_name)
+            width = image.shape[1]
+            image_center_x = width // 2
+            detected_lines = set()
 
-        return {"lane": check_lane_type(detected_lines)}
+            results = model.predict(image)
+            for result in results:
+                class_names = result.names
+                if len(result.boxes) == 0:
+                    lane_type = "no detection"
+                    break
+                for box in result.boxes:
+                    [x1, y1, x2, y2] = map(int, box.xyxy[0])
+                    cls = int(box.cls[0])
+                    x_center = (x1 + x2) / 2
+                    class_name = class_names[cls]
+                    if x_center < image_center_x:
+                        class_name = "left_" + class_name
+                    else:
+                        class_name = "right_" + class_name
+                    detected_lines.add(class_name)
 
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error")
+                lane_type = check_lane_type(detected_lines)
+
+            results_list.append({
+                "file name": file.filename,
+                "lane": lane_type
+            })
+
+        except Exception as e:
+            results_list.append({
+                "file_name": file.filename,
+                "lane": f"error: {str(e)}"
+            })
+
+    return results_list
