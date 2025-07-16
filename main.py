@@ -1,10 +1,23 @@
 from typing import List
-from fastapi import FastAPI, File, UploadFile, HTTPException
-import cv2
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+import cv2, os
 import numpy as np
 from ultralytics import YOLO
+from dotenv import load_dotenv
+load_dotenv()
+
+
 
 app = FastAPI()
+
+API_KEY = os.getenv("API_KEY")
+
+async def verify_api_key(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    token = authorization.split("Bearer ")[1]
+    if token != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
 LANE_RULES = {
     "left_lane": {
@@ -29,7 +42,7 @@ def check_lane_type(detected_lines: set) -> str:
 
 model = YOLO("lane_line_detection_v1.pt")
 
-@app.post("/detect/")
+@app.post("/detect/", summary="Detect Lane Type", dependencies=[Depends(verify_api_key)])
 async def detect_objects(files: List[UploadFile] = File(...)):
     results_list = []
 
