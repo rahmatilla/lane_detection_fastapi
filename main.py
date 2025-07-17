@@ -20,15 +20,15 @@ async def verify_api_key(authorization: str = Header(...)):
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 LANE_RULES = {
-    "left_lane": {
+    "LEFT": {
         "left": {"left_solid_white", "left_solid_yellow", "left_double_solid_white", "left_double_solid_yellow"},
         "right": {"right_broken_white", "right_broken_yellow"}
     },
-    "middle_lane": {
+    "MIDDLE": {
         "left": {"left_broken_white", "left_broken_yellow"},
         "right": {"right_broken_white", "right_broken_yellow"}
     },
-    "right_lane": {
+    "RIGHT": {
         "left": {"left_broken_white", "left_broken_yellow"},
         "right": {"right_solid_white", "right_solid_yellow"}
     }
@@ -38,7 +38,7 @@ def check_lane_type(detected_lines: set) -> str:
     for lane, rules in LANE_RULES.items():
         if any(left in detected_lines for left in rules['left']) and any(right in detected_lines for right in rules['right']):
             return lane
-    return "Lane type not detected."
+    return "NO_ROAD"
 
 model = YOLO("lane_line_detection_v1.pt")
 
@@ -63,7 +63,7 @@ async def detect_objects(files: List[UploadFile] = File(...)):
             for result in results:
                 class_names = result.names
                 if len(result.boxes) == 0:
-                    lane_type = "no detection"
+                    lane_type = "NO_ROAD"
                     break
                 for box in result.boxes:
                     [x1, y1, x2, y2] = map(int, box.xyxy[0])
@@ -79,14 +79,14 @@ async def detect_objects(files: List[UploadFile] = File(...)):
                 lane_type = check_lane_type(detected_lines)
 
             results_list.append({
-                "file_name": file.filename,
-                "lane": lane_type
+                "lane": lane_type,
+                "vehicle_id": file.filename
             })
 
         except Exception as e:
             results_list.append({
-                "file_name": file.filename,
-                "lane": f"error: {str(e)}"
+                "lane": f"error: {str(e)}",
+                "vehicle_id": file.filename
             })
 
     return results_list
