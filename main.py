@@ -40,7 +40,7 @@ def check_lane_type(detected_lines: set) -> str:
             return lane
     return "NO_ROAD"
 
-model = YOLO("road_line_detection_v1.pt")
+model = YOLO("./model/road_line_detection_v1.pt")
 
 @app.post("/detect/", summary="Detect Lane Type", dependencies=[Depends(verify_api_key)])
 async def detect_objects(files: List[UploadFile] = File(...)):
